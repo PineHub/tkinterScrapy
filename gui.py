@@ -1,13 +1,17 @@
 from Tkinter import *
-from hello_world import *
 from subprocess import call
+import csv
+import os
+import tkMessageBox
 
 
 class MyFirstGUI:
-    LABEL_TEXT = [
+    LABEL_TEXT = [  # scrollable text
         "Welcome to my crawl-visualizer! This label is clickable.",
         "Complete the four entries below.",
         "When done, click Go!",
+        "The visualizer creates color combinations that depend on the length of the link, pages crawled, and time of day."
+        "Then click the Results button."
         "Go on, click this label again.",
     ]
 
@@ -15,7 +19,8 @@ class MyFirstGUI:
         self.master = master
         master.title("Keyword Web Crawler by Clarence Pine")
 
-        #main label giving instructions at top of text box
+
+        # main label giving instructions at top of text box
         self.label_index = 0
         self.label_text = StringVar()
         self.label_text.set(self.LABEL_TEXT[self.label_index])
@@ -24,7 +29,7 @@ class MyFirstGUI:
         self.label.pack()
         self.label.config(font=("Calibri", 25))
 
-        #url entry box
+        # url entry box
         self.url_input = StringVar()  #value of url
         self.url_entry = Entry(master, textvariable=self.url_input, width=30)
         self.urlEntryText = StringVar()
@@ -33,9 +38,9 @@ class MyFirstGUI:
         self.urlLabelEntry.config(font=('Arial', 15))
         self.urlLabelEntry.pack(side="top")
         self.url_entry.pack(side="top")
-        self.url_entry.insert(0, "http:\\\\")
+        self.url_entry.insert(0, "http:\\\\") #pre-populate url entry box
 
-        #keyword entry box
+        # keyword entry box
         self.keyword_input = StringVar() #value of keyword
         self.keyword_entry = Entry(master, textvariable=self.keyword_input, width=30)
         self.keywordEntryText = StringVar()
@@ -55,7 +60,7 @@ class MyFirstGUI:
         self.pageLabelEntry.pack(side="top")
         self.maxpage_entry.pack(side="top")
 
-        #dropdown menu to choose depth-first or breadth-first search
+        # dropdown menu to choose depth-first or breadth-first search
         self.searchChoice = StringVar() #value of breadth vs depth first search
         self.dropSearch = OptionMenu(master, self.searchChoice, 'Breadth-First Search', 'Depth-First Search')
         self.searchText = StringVar()
@@ -65,13 +70,12 @@ class MyFirstGUI:
         self.searchLabelEntry.pack(side="top")
         self.dropSearch.pack(side="top")
 
-
-        self.crawl_button = Button(master, text="Go!", command=self.crawl)  #Go! button
+        # Go! button
+        self.crawl_button = Button(master, text="Go!", command=self.crawl)
         self.crawl_button.pack()
 
-
-
-        self.close_button = Button(master, text="Close", command=master.quit)  #Close button
+        # Close button
+        self.close_button = Button(master, text="Close", command=master.quit)
         self.close_button.pack()
 
 
@@ -79,8 +83,8 @@ class MyFirstGUI:
     def crawl(self):
 
         urlString = self.url_input.get()
-        newUrlString = urlString[7:]            #remove http://// from the url string
-        newUrlString = 'http://' + newUrlString  #add http:// to the url string
+        newUrlString = urlString[7:]            # remove http://// from the url string
+        newUrlString = 'http://' + newUrlString  # add http:// to the url string
 
         keywordString = self.keyword_input.get()
 
@@ -88,9 +92,15 @@ class MyFirstGUI:
 
         searchTypeString = self.searchChoice.get()
 
+        try:
+            os.remove("tempout.csv")  # remove this file if it exists
+        except OSError:
+            pass
+
         #two different types of arguments: breadth and depth-first search:
-        bSearchArgument = "scrapy crawl keyword_search -a start_url=" + newUrlString + " -a find_word=" + keywordString + " -s " + "CLOSESPIDER_PAGECOUNT=" + maxPageString
-        dSearchArgument = "scrapy crawl keyword_search -a start_url=" + newUrlString + " -a find_word=" + keywordString + " -s " + "CLOSESPIDER_PAGECOUNT=" + maxPageString + " -s DEPTH_PRIORITY=1 -s SCHEDULER_DISK_QUEUE=scrapy.squeues.PickleFifoDiskQueue -s SCHEDULER_MEMORY_QUEUE=scrapy.squeues.FifoMemoryQueue"
+        #outputting to a readable csv file
+        bSearchArgument = "scrapy crawl keyword_search -a start_url=" + newUrlString + " -a find_word=" + keywordString + " -s " + "CLOSESPIDER_PAGECOUNT=" + maxPageString + " -o tempout.CSV -t csv"
+        dSearchArgument = "scrapy crawl keyword_search -a start_url=" + newUrlString + " -a find_word=" + keywordString + " -s " + "CLOSESPIDER_PAGECOUNT=" + maxPageString + " -s DEPTH_PRIORITY=1 -s SCHEDULER_DISK_QUEUE=scrapy.squeues.PickleFifoDiskQueue -s SCHEDULER_MEMORY_QUEUE=scrapy.squeues.FifoMemoryQueue -o tempout.CSV -t csv"
 
         if searchTypeString == "Depth-First Search":
             call(dSearchArgument)
@@ -98,12 +108,80 @@ class MyFirstGUI:
             call(bSearchArgument)
 
 
+        try:
+            self.resultButton.destroy()  #remove this button if it exists
+        except AttributeError:
+            pass
+
+        self.resultButton = Button(root, text="Results", command=self.results_window)
+        self.resultButton.pack()
+
+
+
+
+
+
+
     def cycle_label_text(self, event):
         self.label_index += 1
         self.label_index %= len(self.LABEL_TEXT)  # wrap around
         self.label_text.set(self.LABEL_TEXT[self.label_index])
 
+    def results_window(self):
 
+        master = self.master
+        keyWordNotFound = True
+
+
+        with open('tempout.csv') as csvfile:        # reading the csv file
+            reader = csv.DictReader(csvfile)
+            resultStarter = "We found your keyword at: "
+            resultSentenceStarter = "in this line: "
+            for row in reader:
+                if row['targetNode']:  # if the keyword was found, targetNode would be true
+                    targetLink = row['urlDict']
+                    targetSentence = row['targetNode'].decode('unicode_escape')  # unicode \u removal
+                    keyWordNotFound = False
+                    targetLink = targetLink[17:-2]
+                    print "targetLink length: ", len(targetLink)
+                    if len(targetLink) > 85:        # if the length of the link is too long, shorten it to 85 characters with ellipse
+                        newLength = (len(targetLink) - 85) * -1
+                        print "newLength: ", newLength
+                        targetLink = targetLink[:newLength] + "..."
+                        print "new targetLink length: ", len(targetLink), "link is: ", targetLink
+                    targetSentence = targetSentence[7:-3]
+                    if len(targetSentence) > 250:     # shorten length of sentece keyword is found with ellipse
+                        newLengthSentence = (len(targetSentence) - 250) * -1
+                        targetSentence = targetSentence[:newLengthSentence] + "..."
+
+
+
+
+            if not keyWordNotFound:
+                resultLinkStarter = resultStarter + targetLink + "\n" + resultSentenceStarter + targetSentence  # message advising of link, sentence with keyword.
+                tkMessageBox.showinfo("Results", resultLinkStarter)
+
+            else:
+                tkMessageBox.showinfo("Results", "We couldn't find your word")
+
+
+
+
+
+
+
+        # window.result_button = Button(window, text="Done", command=window.destroy)  # done with results button
+        # window.result_button.pack()
+
+        try:
+            os.remove("tempout.csv")  #remove this file if it exists
+        except OSError:
+            pass
+
+try:
+    os.remove("tempout.csv")  #remove this file if it exists
+except OSError:
+    pass
 
 root = Tk()
 my_gui = MyFirstGUI(root)
