@@ -10,4 +10,4 @@ If the keyword was found, the results window will pull up the link the keyword w
 
 This was created on a Windows 10 system with Python 2.7x.
 
-The only external library (that I know of) that this program requires is scrapy. So `<pip install>` scrapy" at the terminal before running `<gui.py>` from the **tkinterScrapy** directory
+The only external library (that I know of) that this program requires is scrapy. So `pip install scrapy` at the terminal before running `gui.py` from the **tkinterScrapy** directory
